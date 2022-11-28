@@ -1,0 +1,118 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(modelr)       #Helpful Functions in Modeling
+library(purrr)
+library(broom)
+
+# Import Data Below
+# read_csv()
+```
+
+```{r}
+#read CSV files
+HALElifeExpectancy = read_csv("HALElifeExpectancyAtBirth.csv")
+AlcoholSubstanceAbuse = read_csv("alcoholSubstanceAbuse.csv")
+medicalDoctors = read_csv("medicalDoctors.csv")
+uhcCoverage = read_csv("uhcCoverage.csv")
+crudeSuicideRates = read_csv("crudeSuicideRates.csv")
+roadTrafficDeaths = read_csv("roadTrafficDeaths.csv")
+reproductiveAgeWomen = read_csv("reproductiveAgeWomen.csv")
+adolescentBirthRate = read_csv("adolescentBirthRate.csv")
+eliminateViolenceAgainstWomen = read_csv("eliminateViolenceAgainstWomen.csv")
+`3070cancerChdEtc` = read_csv("30-70cancerChdEtc.csv")
+airPollutionDeathRate = read_csv("airPollutionDeathRate.csv")
+atLeastBasicSanitizationServices <- read_csv("atLeastBasicSanitizationServices.csv")
+```
+```{r, eval = T}
+#Julia DATA Chunk
+HALElifeExpectancy_JY <- 
+  HALElifeExpectancy %>%
+  select(-Indicator)  %>%
+  rename("HALE"="First Tooltip", 
+         "Year" = "Period",
+         "Sex" = "Dim1") %>%
+  arrange(desc(Year))
+medicalDoctors_JY <- 
+  medicalDoctors %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Medical_Doctors" = "First Tooltip")
+AlcoholSubstanceAbuse_JY <- 
+  AlcoholSubstanceAbuse %>%
+  select(-Indicator)  %>%
+  rename("Alcohol_Substance_Abuse"="First Tooltip", 
+         "Year" = "Period",
+         "Sex" = "Dim1")
+HALE_MD_ASA <-HALElifeExpectancy_JY %>%
+  full_join(medicalDoctors_JY, by = c("Location", "Year")) %>%
+  full_join(AlcoholSubstanceAbuse_JY, by = c("Location", "Year","Sex"))
+HALE_MD_ASA
+HALE_MD_ASA_new<- na.omit(HALE_MD_ASA) %>%
+  filter(Sex=="Female")
+HALE_MD_ASA_new
+```
+
+
+```{r}
+cor_data <- HALE_MD_ASA_new%>%
+  select(-c(Location,Sex)) 
+print(round(cor(cor_data),3))
+```
+
+```{r}
+#Innocent model
+#Even though the variables are significant, the residual plot, Q-Q plot, standarded residuals are not good. So I want to improve the model.
+mod1=lm(HALE~(Alcohol_Substance_Abuse)+(Medical_Doctors),data=HALE_MD_ASA_new)
+summary(mod1)
+plot(mod1)
+```
+
+```{r}
+#Function chunk
+train.model.func=function(data,i,j){
+  mod=lm(HALE~poly(Alcohol_Substance_Abuse,i)+poly(Medical_Doctors,j),data=HALE_MD_ASA_new)
+  return(mod)
+}
+RMSE.func=function(actual,predict){
+  mse=mean((actual-predict)^2,na.rm=T)
+  rmse=sqrt(mse)
+  return(rmse)
+}
+```
+
+```{r}
+DATA_JY=na.omit(HALE_MD_ASA_new) %>% crossv_kfold(10)
+DATA_JY
+```
+
+```{r}
+max_i = 5
+max_j = 5
+rmse_results = matrix(NA,max_i,max_j)
+for(i in 1:max_i){
+  for(j in 1:max_j){
+    DATA_new=DATA_JY %>%
+      mutate(tr.model=map(train, train.model.func, i=i, j=j))
+    DATA_new.PREDICT=DATA_new%>%
+      mutate(predict=map2(test, tr.model,~augment(.y,newdata=.x)))%>%
+      select(predict)%>%
+      unnest()
+rmse_results[i,j]=RMSE.func(actual=DATA_new.PREDICT$HALE, predict=DATA_new.PREDICT$.fitted)
+  }
+}
+```
+
+```{r}
+which(rmse_results==min(rmse_results), arr.ind = T)
+```
+```{r}
+mod_new=lm(HALE~poly(Alcohol_Substance_Abuse,5)+poly(Medical_Doctors,5),data=HALE_MD_ASA_new)
+summary(mod_new)
+plot(mod_new)
+```

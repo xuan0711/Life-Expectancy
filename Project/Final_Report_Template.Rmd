@@ -1,0 +1,501 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(modelr)
+library(broom)
+library(formattable)
+library(rvest)
+library(magrittr)
+library(ggmap)
+library(stringr)
+library(gganimate)
+library(gifski)
+library(plotly)
+
+
+#Put Necessary Libraries Here
+```
+##Group 24##
+Creator: Kevin Lu
+Interpreter: Aditi Chiney
+Orator: Jessica Barta
+Deliverer: JULIA MENGXUAN YU
+
+# INTRODUCTION
+Group 24 chose the World Health Statistics 2020 dataset out of a broad interest in global health and a sense of deep curiosity. We wondered: What is the state of global health? Which countries are becoming healthier, and which countries are becoming less healthy? Do health outcomes differ by gender or race? Due to its wide scope and reputable source (the WHO), the dataset had the potential to answer real, meaningful questions about the health of our world. This made narrowing down potential questions a challenge! After the exploratory data analysis, though, our group decided on two main questions: 
+* Which health variables are most significant in predicting female HALE?
+* How has universal healthcare coverage (UHC) changed over time on a global scale and can we predict how UHC will change into the future?
+
+The group decided on the first question based on an awareness of the worldwide disparities that often exist between men’s and women’s health. A report by the WHO on Women and Gender Equality notes that in nearly all societies, women possess less property, wealth, and land than men, yet take on the majority of care-related tasks that involve maintaining the physical health and well-being of family and friends. In some societies, restriction of women’s activity, education, and reproductive capacities are perceived as natural, and legal systems may fail to punish or even encourage violence against women. For example, from summer 2016-2017, the Supreme Court of the Russian Federation signed several bills into law that made the penalties for domestic violence administrative offenses rather than criminal offenses. Overall, there are many different factors (not just domestic violence)  that can influence women’s health, and therefore their lifespan, within a country. Which predictors are significant? Which will best predict female HALE? Knowing the answer to these questions could potentially give researchers and policymakers a place to start when researching how best to improve women’s status and well-being around the world. 
+
+While investigating the first question, the group found that UHC, or universal healthcare coverage, was a significant predictor of women’s HALE. (For background, the WHO assigns a UHC index to indicate, among other things, how accessible and affordable healthcare is in a country.) So our group developed a global map showing the distribution of coverage over time. We also constructed a simple model to project UHC indices into the future. The group was aware that healthcare access tends to improve as a country develops, but  this is not always the case. Some countries have free healthcare or ensure healthcare access for all their citizens, while others do not. Some countries are a great deal wealthier than others. So which countries would have better healthcare coverage scores? Was healthcare coverage greater in wealthier countries? Was it worse in still-developing countries? Was excellent healthcare coverage a mostly western phenomenon? Since the WHO dataset did not contain information on countries’ wealth, government type or strategy for providing healthcare, this map would just begin to illustrate patterns in healthcare. Such patterns could be used to construct predictive models later using a more complete dataset.
+
+# DATA
+We discovered our dataset on Kaggle. A user named “Zeus” uploaded it to Kaggle 3 months ago. However, the true origin of the dataset is from the World Health Organization (WHO). The WHO runs a global health monitoring program called the Global Health Observatory (GHO). Health data is compiled by the WHO GHO from the various publications and databases managed by the WHO, some partner United Nations agencies, and the individual WHO Member States’ health monitoring agencies. At the end of every year, the GHO releases a formal report on annual trends since 2000 and makes health data publicly available. The user Zeus appeared to have downloaded a portion of this public data from the 2020 release (approximately 25 variables), partially cleaned the data, and uploaded this data as a set of CSV files to Kaggle, where we encountered it. We chose to download 10 variables that we found most interesting and useful from Zeus’ post and utilize it for our project.
+###These variables include the following: 
+* ambient/household air pollution-attributable death rate (per 100,000 population)
+* probability (as %) of dying between ages 30-70 from cardiovascular disease, cancer, diabetes, or chronic respiratory disease
+* total (recorded & unrecorded) alcohol per capita (ages 15+) consumption
+* crude suicide rates (per 100,000 population)
+* population (%) using at least basic sanitation services
+* healthy average life expectancy (HALE) at birth in years
+* number of medical doctors (per 10,000 population)
+* number of nursing and midwifery personnel (per 10,000 population)
+* universal healthcare (UHC) index of essential services coverage
+* adolescent birth rate (per 1000 women aged 15-19)
+
+An important note is that for each variable, data is not consistently available for every single year since 2000 nor for every country in the world. Each variable also had its own CSV file when Zeus uploaded it; for these reasons, the number of observations for each variable was different. However, for the purposes of our report, we focused on the year 2015 as data was available for most variables for this year. The number of observations for our 5 main variables of interest was 59 (i.e. data from 2015 was available for 59 countries for 5 variables). The table below shows the head of the dataset in which we combined our 5 main variables of interest.
+```{r}
+#read CSV files
+HALElifeExpectancy = read_csv("HALElifeExpectancyAtBirth.csv")
+AlcoholSubstanceAbuse = read_csv("alcoholSubstanceAbuse.csv")
+medicalDoctors = read_csv("medicalDoctors.csv")
+uhcCoverage = read_csv("uhcCoverage.csv")
+crudeSuicideRates = read_csv("crudeSuicideRates.csv")
+roadTrafficDeaths = read_csv("roadTrafficDeaths.csv")
+reproductiveAgeWomen = read_csv("reproductiveAgeWomen.csv")
+adolescentBirthRate = read_csv("adolescentBirthRate.csv")
+eliminateViolenceAgainstWomen = read_csv("eliminateViolenceAgainstWomen.csv")
+`3070cancerChdEtc` = read_csv("30-70cancerChdEtc.csv")
+airPollutionDeathRate = read_csv("airPollutionDeathRate.csv")
+atLeastBasicSanitizationServices <- read_csv("atLeastBasicSanitizationServices.csv")
+nursingAndMidwife <- read_csv("nursingAndMidwife.csv")
+```
+```{r}
+# tidy data
+uhc_coverage_clean <- 
+  uhcCoverage %>% 
+  pivot_wider(names_from = 'Indicator', values_from = 'First Tooltip')
+
+uhc_coverage_clean_locations = str_replace_all(uhc_coverage_clean$Location, c(" " = "_"))
+
+uhc_coverage_clean_with_underscores = mutate(uhc_coverage_clean, 'Location' = uhc_coverage_clean_locations)
+
+reproductiveAgeWomen_Clean <- 
+  reproductiveAgeWomen %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Percent of women with family planning needs satisfied" = "First Tooltip")
+
+adolescentBirthRate_Clean <- 
+  adolescentBirthRate %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Adolescent birth rate" = "First Tooltip")
+
+HALElifeExpectancy_Clean <-
+  HALElifeExpectancy %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("HALE_Both sexes" = "Both sexes", 
+         "HALE_Male" = "Male", 
+         "HALE_Female" = "Female", 
+         "Year" = "Period")
+
+uhc_coverage_clean_with_underscores_renamed <-
+  uhc_coverage_clean_with_underscores %>%
+  rename("Year" = "Period") 
+
+medicalDoctors_clean <- 
+  medicalDoctors %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Medical_Doctors" = "First Tooltip")
+
+nursingAndMidwife_clean <- nursingAndMidwife %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Nursing_And_Midwife" = "First Tooltip")
+
+Female_HALE_regressors <- uhc_coverage_clean_with_underscores_renamed %>%
+  full_join(adolescentBirthRate_Clean, by = c("Location", "Year")) %>%
+  full_join(HALElifeExpectancy_Clean, by = c("Location", "Year")) %>%
+  full_join(medicalDoctors_clean, by = c("Location", "Year")) %>%
+  full_join(nursingAndMidwife_clean, by = c("Location", "Year")) %>%
+  drop_na() %>%
+  select(-"HALE_Both sexes", -"HALE_Male") %>%
+  rename("UHC" = "UHC index of essential service coverage")
+```
+```{r}
+col_order <- c("Location", "Year", "HALE_Female", "UHC", "Adolescent birth rate", "Medical_Doctors", "Nursing_And_Midwife")
+Female_HALE_regressors_adjusted = Female_HALE_regressors[, col_order]
+var_summary <- formattable(head(Female_HALE_regressors_adjusted), list("Adolescent birth rate" = color_bar("lightblue"), "UHC" = color_bar("lightpink"), "Medical_Doctors" = color_bar("lightgreen"), "Nursing_And_Midwife" = color_bar("lightgray")))
+var_summary
+```
+We selected our 5 main variables of interest based on our EDA findings and our personal interests in women’s health. In our EDA, we plotted _female HALE_ against all 9 other variables in our dataset and found positive linear trends for 4 of those 9, which were _UHC index_, _ABR_, _medical doctors_ and _nurses and midwives_. One notably strong positive linear trend is shown below, between the UHC index and female HALE. Based on these results, we decided to build a model that would allow us to predict female HALE globally in 2015. We also created a map to visualize trends in female HALE over time on a global scale and created a model to predict female HALE into future years.
+```{r}
+uhc_femalelifeexpectancy <- uhc_coverage_clean_with_underscores_renamed %>%
+  full_join(HALElifeExpectancy_Clean, by = c("Location", "Year")) %>%
+  drop_na() %>%
+  select(-"HALE_Both sexes", -"HALE_Male") %>%
+  filter(Year == 2015)
+AC_Plot3 <- ggplot(data = uhc_femalelifeexpectancy, aes(x = `UHC index of essential service coverage`, y = `HALE_Female`)) +
+  geom_point() +  geom_smooth(method= 'lm') + 
+  theme(plot.margin=unit(c(2,1,1,1),"pt"), plot.title = element_text(hjust = 0.5)) +
+  ggtitle("UHC Index vs. Female healthy average life expectancy (HALE)") +
+  labs(x="UHC Index of Service Coverage (SCI)", y="Female healthy average life expectancy")
+```
+
+# RESULTS
+#Question1#
+```{r}
+MAE.func = function(resid) {
+  return(mean(abs(resid)))
+}
+```
+```{r}
+set.seed(100)
+FHR_shuffle <- Female_HALE_regressors[sample(nrow(Female_HALE_regressors)),]
+
+indices <- sample(seq_len(nrow(FHR_shuffle)), size=round(0.8*nrow(FHR_shuffle)))
+
+train_data <- FHR_shuffle[indices,]
+test_data <- FHR_shuffle[-indices,]
+```
+```{r}
+uhc_model <- lm(HALE_Female~UHC,data=train_data)
+teen_pregnancy_model <- lm(HALE_Female~`Adolescent birth rate`, data=train_data)
+med_doc_model <- lm(HALE_Female~Medical_Doctors, data=train_data)
+midwife_model <- lm(HALE_Female~Nursing_And_Midwife, data=train_data)
+uhc_teen_pregnancy_model <- lm(HALE_Female~UHC+`Adolescent birth rate`, data=train_data)
+all_regressors_model <- lm(HALE_Female~UHC+`Adolescent birth rate`+Medical_Doctors+Nursing_And_Midwife, data=train_data)
+Full=lm(HALE_Female~UHC+`Adolescent birth rate`+Medical_Doctors+Nursing_And_Midwife, data=train_data)
+#Method1
+MSE = (summary(Full)$sigma)^2
+step(Full, scale=MSE)
+#Method2
+none = lm(HALE_Female~1, data=train_data)
+step(none, scope=list(upper=Full), scale=MSE)
+```
+###Part 2
+```{r}
+world_map_table <-map_data("world")
+
+
+uhc_coverage_clean <-  uhc_coverage_clean %>%
+  rename(
+    `Coverage Index` = `UHC index of essential service coverage`)
+
+uhc_model <-(lm(uhc_coverage_clean$`Coverage Index`~uhc_coverage_clean$Period))
+
+summary(uhc_model)
+
+
+view(uhc_coverage_clean)
+view(unique(world_map_table$region))
+
+# RECODE NAMES
+uhc_coverage_clean$Location <- recode(uhc_coverage_clean$Location,
+                                  'United States of America' = 'USA',
+                                   'Russian Federation' = 'Russia',
+                                  'Bolivia (Plurinational State of)' = "Bolivia",
+                                  'Venezuela (Bolivarian Republic of)' = 'Venezuela',
+                                  'Côte d’Ivoire' = "Ivory Coast",
+                                  "United Republic of Tanzania" = "Tanzania",
+                                  "Congo" = "Republic of Congo",
+                                  "United Kingdom of Great Britain and Northern Ireland" = "UK",
+                                  "Czechia"= "Czech Republic",
+                                  "Republic of Moldova" = "Moldova",
+                                  "The former Yugoslav Republic of Macedonia" = "Macedonia",
+                                  "Iran (Islamic Republic of)" = "Iran",
+                                  "Syrian Arab Republic" = "Syria", 
+                                  "Republic of Korea" = "South Korea",
+                                  "Democratic People's Republic of Korea" = "North Korea",
+                                  "Viet Nam" = "Vietnam",
+                                  "Lao People's Democratic Republic" = "Laos"
+                                  )
+#join tables
+both_tables = full_join(uhc_coverage_clean, world_map_table, by = c("Location" = "region"))
+head(both_tables)
+
+both_tables$Period <- as.integer(both_tables$'Period')
+
+head(both_tables)
+
+both_tables <- both_tables %>% 
+  rename(
+    Latitude = lat,
+    Longitude = long)
+
+#plot map data
+overall_map <- ggplot() +
+  geom_polygon(data = both_tables, aes(x = Longitude, y = Latitude, group = group, fill = `Coverage Index`)) +
+  labs(title = 'Essential Healthcare Coverage by Country') +
+  theme(legend.title = element_text(size = 5), 
+               legend.text = element_text(size = 4)) +
+  guides(color = guide_legend(override.aes = list(size = 0.5)))
+
+#animation—
+test_animation = overall_map + transition_manual(
+    both_tables$Period
+  )
+
+test_animation
+
+#plotly graph
+plotly_map = ggplotly(p = overall_map)
+plotly_map
+
+
+#now try it with both 2015 and 2017! 
+
+data_from_2017 = filter(uhc_coverage_clean, Period == 2017)
+data_from_2015 = filter(uhc_coverage_clean, Period == 2015)
+
+both_tables_2017 = full_join(data_from_2017, world_map_table, by = c("Location" = "region"))
+both_tables_2015 = full_join(data_from_2015, world_map_table, by = c("Location" = "region"))
+
+both_tables_2017 <- both_tables_2017 %>% 
+  rename(
+    Latitude = lat,
+    Longitude = long)
+
+both_tables_2015 <- both_tables_2015 %>% 
+  rename(
+    Latitude = lat,
+    Longitude = long)
+both_tables_2015
+
+map_2017 <- ggplot() +
+  geom_polygon(data = both_tables_2017, aes(x = Longitude, y = Latitude, group = group, fill = `Coverage Index`)) +
+  labs(title = 'Essential Healthcare Coverage by Country in 2017') +
+  scale_fill_continuous(name = "Coverage\nIndex", breaks = c(30, 40, 50, 60,70, 80, 90, 100)) +
+  theme(legend.title = element_text(size = 7), 
+               legend.text = element_text(size = 6))
+
+plotly_map_2017 = ggplotly(p = map_2017)
+plotly_map_2017
+
+
+
+map_2015 <-ggplot() +
+  geom_polygon(data = both_tables_2015, aes(x = Longitude, y = Latitude, group = group, fill = `Coverage Index`)) +
+  labs(title = 'Essential Healthcare Coverage by Country in 2015') 
+
+map_2015 <- map_2015 %>% +
+scale_fill_continuous(breaks = c(20, 30, 40, 50, 60, 70, 80, 90, 100)) +
+theme(legend.title = element_text(size = 7), 
+               legend.text = element_text(size = 6)) 
+map_2015
+map_2017
+overall_map
+
+```
+
+```{r}
+world_map_table <-map_data("world")
+
+# RECODE NAMES
+uhc_coverage_clean$Location <- recode(uhc_coverage_clean$Location,
+                                  'United States of America' = 'USA',
+                                   'Russian Federation' = 'Russia',
+                                  'Bolivia (Plurinational State of)' = "Bolivia",
+                                  'Venezuela (Bolivarian Republic of)' = 'Venezuela',
+                                  'Côte d’Ivoire' = "Ivory Coast",
+                                  "United Republic of Tanzania" = "Tanzania",
+                                  "Congo" = "Republic of Congo",
+                                  "United Kingdom of Great Britain and Northern Ireland" = "UK",
+                                  "Czechia"= "Czech Republic",
+                                  "Republic of Moldova" = "Moldova",
+                                  "The former Yugoslav Republic of Macedonia" = "Macedonia",
+                                  "Iran (Islamic Republic of)" = "Iran",
+                                  "Syrian Arab Republic" = "Syria", 
+                                  "Republic of Korea" = "South Korea",
+                                  "Democratic People's Republic of Korea" = "North Korea",
+                                  "Viet Nam" = "Vietnam",
+                                  "Lao People's Democratic Republic" = "Laos",
+                                  "Sudan (until 2011)" = "Sudan"
+                                  )
+
+#select 2017 data, join it with map data, rename variables and plot it
+
+data_from_2017 = filter(uhc_coverage_clean, Period == 2017)
+
+both_tables_2017 = full_join(data_from_2017, world_map_table, by = c("Location" = "region"))
+
+both_tables_2017 <- both_tables_2017 %>% 
+  rename(
+    Latitude = lat,
+    Longitude = long)
+
+map_2017 <- ggplot() +
+  geom_polygon(data = both_tables_2017, aes(x = Longitude, y = Latitude, group = group, fill = `Coverage Index`)) +
+  labs(title = 'Essential Healthcare Coverage by Country in 2017') +
+  scale_fill_continuous(name = "Coverage\nIndex", breaks = c(30, 40, 50, 60,70, 80, 90, 100)) +
+  theme(legend.title = element_text(size = 7), 
+               legend.text = element_text(size = 6))
+
+plotly_map_2017 = ggplotly(p = map_2017)
+plotly_map_2017
+
+
+#now I will plot a gif of change over time from 2015-2017 
+
+#plot map data
+overall_map <- ggplot() +
+  geom_polygon(data = both_tables, aes(x = Longitude, y = Latitude, group = group, fill = `Coverage Index`)) +
+  labs(title = 'Essential Healthcare Coverage by Country 2015-2017') +
+  scale_fill_continuous(name = "Coverage\nIndex", breaks = c(30, 40, 50, 60,70, 80, 90, 100)) +
+  theme(legend.title = element_text(size = 5), 
+               legend.text = element_text(size = 4)) +
+  guides(color = guide_legend(override.aes = list(size = 0.5)))
+
+#animation
+test_animation = overall_map + transition_manual(
+    both_tables$Period)
+test_animation
+
+
+#now let's try graphing the countries that experienced the greatest change 
+
+#first widen dataset to include indexes from 2017 and 2015 separately
+
+library(tidyr)
+wider_data = pivot_wider(both_tables, names_from = Period, values_from = `Coverage Index`)
+head(wider_data)
+wider_data_final <- mutate(wider_data, Change = wider_data$`2017` - wider_data$`2015`)
+
+#now graph the changes! 
+
+overall_map_changes <- ggplot() +
+  geom_polygon(data = wider_data_final, aes(x = Longitude, y = Latitude, group = group, fill = `Change`)) +
+  labs(title = 'Changes in Coverage, 2015-2017') +
+  scale_fill_continuous(name = "Coverage Change") +
+  theme(legend.title = element_text(size = 5), 
+               legend.text = element_text(size = 4)) +
+  guides(color = guide_legend(override.aes = list(size = 0.5)))
+
+?full_join
+```
+
+```{r}
+HALElifeExpectancy_Clean <-
+  HALElifeExpectancy %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("HALE_Both sexes" = "Both sexes", 
+         "HALE_Male" = "Male", 
+         "HALE_Female" = "Female", 
+         "Year" = "Period")
+world_map_table <-map_data("world")
+# RECODE NAMES
+HALElifeExpectancy_Clean$Location <- recode(HALElifeExpectancy_Clean$Location,
+                                  'United States of America' = 'USA',
+                                   'Russian Federation' = 'Russia',
+                                  'Bolivia (Plurinational State of)' = "Bolivia",
+                                  'Venezuela (Bolivarian Republic of)' = 'Venezuela',
+                                  'Côte d’Ivoire' = "Ivory Coast",
+                                  "United Republic of Tanzania" = "Tanzania",
+                                  "Congo" = "Republic of Congo",
+                                  "United Kingdom of Great Britain and Northern Ireland" = "UK",
+                                  "Czechia"= "Czech Republic",
+                                  "Republic of Moldova" = "Moldova",
+                                  "The former Yugoslav Republic of Macedonia" = "Macedonia",
+                                  "Iran (Islamic Republic of)" = "Iran",
+                                  "Syrian Arab Republic" = "Syria", 
+                                  "Republic of Korea" = "South Korea",
+                                  "Democratic People's Republic of Korea" = "North Korea",
+                                  "Viet Nam" = "Vietnam",
+                                  "Lao People's Democratic Republic" = "Laos",
+                                  "Sudan (until 2011)" = "Sudan"
+          )
+
+#select 2017 data, join it with map data, rename variables and plot it
+data_from_HALE = filter(uhc_coverage_clean, Period == 2017)
+both_tables_all = full_join(HALElifeExpectancy_Clean, world_map_table, by = c("Location" = "region"))
+
+both_tables_all <- both_tables_all %>% 
+  rename(
+    Latitude = lat,
+    Longitude = long)
+
+map_all <- ggplot() +
+  geom_polygon(data = both_tables_all, aes(x = Longitude, y = Latitude, group = group, fill = `HALE_Female`)) +
+  labs(title = 'Female Global Healthy Average Life Expectancy (HALE), 2000-2019') +
+  scale_fill_continuous(name = "Women's HALE (years)") +
+  theme(legend.title = element_text(size = 7), 
+               legend.text = element_text(size = 6))
+
+head(both_tables_all)
+
+test_animation_2 = map_all + transition_manual(
+    both_tables_all$Year)
+
+
+anim_save("Female_HALE_map2.gif", test_animation_2)
+
+#now I will plot a gif of change over time from 2015-2017 
+
+#plot map data
+overall_map <- ggplot() +
+  geom_polygon(data = both_tables, aes(x = Longitude, y = Latitude, group = group, fill = `Coverage Index`)) +
+  labs(title = 'Essential Healthcare Coverage by Country 2015-2017') +
+  scale_fill_continuous(name = "Coverage\nIndex", breaks = c(30, 40, 50, 60,70, 80, 90, 100)) +
+  theme(legend.title = element_text(size = 5), 
+               legend.text = element_text(size = 4)) +
+  guides(color = guide_legend(override.aes = list(size = 0.5)))
+
+?geom_polygon
+
+#animation
+test_animation = overall_map + transition_manual(
+    both_tables$Period)
+
+
+#now let's try graphing the countries that experienced the greatest change 
+
+#first widen dataset to include indexes from 2017 and 2015 separately
+
+library(tidyr)
+wider_data = pivot_wider(both_tables, names_from = Period, values_from = `Coverage Index`)
+head(wider_data)
+wider_data_final <- mutate(wider_data, Change = wider_data$`2017` - wider_data$`2015`)
+wider_data_final
+
+#now graph the changes! 
+
+overall_map_changes <- ggplot() +
+  geom_polygon(data = wider_data_final, aes(x = Longitude, y = Latitude, group = group, fill = `Change`)) +
+  labs(title = 'Changes in Coverage, 2015-2017') +
+  scale_fill_continuous(name = "Coverage Change") +
+  theme(legend.title = element_text(size = 5), 
+               legend.text = element_text(size = 4)) +
+  guides(color = guide_legend(override.aes = list(size = 0.5)))
+
+overall_map_changes
+```
+
+
+
+Next, we decided to develop a map of UHC, or universal healthcare coverage, over time. We chose UHC because it was the most significant predictor of female HALE. To begin, we downloaded map data from the internet into R. This dataset contained columns for latitude, longitude, and country. The dataset had enough geographical data points for R t to map out the outlines of each country. After cleaning the dataset with the UHC coverage data, we joined the two datasets together using the full_join function. 
+
+Next,  we used the geom_polygon function in ggplot to visualize our distribution. When it became apparent that some countries’ data was missing, we went back to each dataset and renamed the countries that had differing names and thus were overlooked during the join. These countries showed up as grey outlines in our map due to the missing data. Countries had different names in each dataset due to a variety of factors, such as reporting longer titles for each country (e.g. “Republic of Korea” vs. “South Korea”) or recent changes in country names (e.g. “Czechia vs. “Czech Republic”). Some areas were not countries at all, such as part of the Sahara, and so they remained grey. (Taiwan was simply missing from the UHC dataset, but the country has excellent universal healthcare coverage.) 
+
+After this, we re-plotted the dataset with the formerly missing areas included and colored in blue to indicate their healthcare coverage data. We experimented with several visualizations after this point. First, we downloaded the plotly package and used it to make an interactive map of the distribution of healthcare coverage for the most recent year in the dataset, 2017. The plotly package allows users to zoom in on portions of the map, and click and drag to navigate. Next, we plotted a map that showed data from both 2015 and 2017 to compare. After this, we plotted a map that showed all this data, but was animated so that it would gradually transition from 2015 coverage to 2017 coverage. We used the gganimation package to complete the animation. We used the transition_manual argument and specified that the transitions should depend on the time data in the dataset. Next, we decided to plot changes in healthcare coverage between 2015 and 2017. 
+
+First, we took the difference in coverage and added a new column in the original dataset using the “mutate” function. Then, we plotted the changes the same way we plotted the original world maps (so no animation this time). If you look closely, you can spot the country that experienced the greatest change in UHC coverage–it’s Moldova! Finally, we decided to project changes in UHC over time, into the future.
+
+. After adding the additional years to the dataset, we went through the same steps of renaming countries, joining the datasets, plotting using geom_polygon, and animating using transition_manual. Since we only had two years’ worth of data in the dataset (data for 2015 and data for 2017), our projections are less reliable than they otherwise would be, especially because we are predicting until 2023. However, they are still useful for showing which how the areas in the world most in need of healthcare coverage might get better over time, into the future. (An interesting question to look into would be, how has COVID affected this? This might make these estimates less reliable and disrupt the current linear pattern.)
+
+# CONCLUSION
+In this project, the group investigated two questions. The first was: Which health variables are most significant in predicting female HALE? The second was: How has universal healthcare coverage changed over time on a global scale and can we predict how UHC will change into the future? In answering. For our first question, after finding the best linear model with three variables (UHC, adolescent birth rate and number of medical doctors) we found that UHC could be the most significant predictor. This led into our second question, where we continued to explore the global distribution of healthcare coverage over time and into the future. Not surprisingly, we found that more developed countries typically provide more healthcare coverage, which can lead to higher healthy average life expectancies for the general population and women in particular. We also found in the future, UHC is predicted to (increase/decrease).
+
+A significant limitation in our analysis was the poor data availability from the WHO. While the WHO does amass large amounts of health data, they do not necessarily collect data on variables that might be more useful in assessing women’s health (such as contraceptive availability or domestic abuse rates). However, though our model for the first question only includes three variables, we believe it can still play a vital role in the real world. Member State governments or other health organizations can use this model as a foundation on which to consider how to improve females’ well-being. Besides, how can countries enhance females’ status? Which element should countries care the most about in order to reduce the differential treatment between men and women? What are the most significant factors that lead to the gap of HALE between men and women between each country? After including more variables into this model, researchers could use train and test data to estimate and solve for these questions.
+
+We looked into what variables might be more useful in future analysis. One of our findings was that the proportion of women in the labor market has increased year by year. In the report called Women’s Trends from ILO (International Labour Organization), we can find that the gap in employment rates between men and women in developing countries is the smallest, followed by developed countries and third in emerging countries. Most developed countries and developing countries have similar HALE values. Some countries in Africa or Asia have smaller HALE values than other countries. This brings the question whether the employment rate of females could be a significant variable, whether national strength influences female HALE, or whether the country’s Gross Domestic Product, education level, or population has a significant impact on female healthy average life expectancy. To achieve several goals mentioned before, researchers require more dataset with variables such as Gross Domestic Product, the length of education, and employment rate in each country all over the world. Therefore, there are more variables researchers could investigate into to build a better model.
+
+There are some ways that our model can be improved for future analyses. One key way we have already discussed is to consider a greater number of relevant variables. Besides this, future modeling processes might also want to add interaction terms between variables (for example, the number of medical doctors and the UHC index likely has some interaction because they are related concepts). We may also want to consider using a nonlinear model by squaring or taking the log of certain variables. This may produce a more significant and accurate predictive model. 
+
+Women’s health remains an important matter as countries develop. Our topic can be extended further by looking at changes in female HALE and universal healthcare index on a more granular level (ex. by state or province instead of by nation) in order to identify hotspots of public health concern. Universal healthcare poses a particularly interesting possibility, as the provision of healthcare services is a matter of controversy especially in the United States. Investigating the spatial distribution of UHC or looking at the relationship between UHC and other key metrics of health besides life expectancy could provide grounds for more compelling arguments to fund universal healthcare.
+
+
+
+
+
+
+
+
+
+

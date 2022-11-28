@@ -1,0 +1,204 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(modelr)
+library(broom)
+
+# Import Data Below
+# read_csv()
+```
+
+```{r}
+#read CSV files
+
+HALElifeExpectancy = read_csv("HALElifeExpectancyAtBirth.csv")
+AlcoholSubstanceAbuse = read_csv("alcoholSubstanceAbuse.csv")
+medicalDoctors = read_csv("medicalDoctors.csv")
+uhcCoverage = read_csv("uhcCoverage.csv")
+crudeSuicideRates = read_csv("crudeSuicideRates.csv")
+roadTrafficDeaths = read_csv("roadTrafficDeaths.csv")
+reproductiveAgeWomen = read_csv("reproductiveAgeWomen.csv")
+adolescentBirthRate = read_csv("adolescentBirthRate.csv")
+eliminateViolenceAgainstWomen = read_csv("eliminateViolenceAgainstWomen.csv")
+`3070cancerChdEtc` = read_csv("30-70cancerChdEtc.csv")
+airPollutionDeathRate = read_csv("airPollutionDeathRate.csv")
+atLeastBasicSanitizationServices <- read_csv("atLeastBasicSanitizationServices.csv")
+nursingAndMidwife <- read_csv("nursingAndMidwife.csv")
+```
+# Data
+```{r}
+uhc_coverage_clean <- 
+  uhcCoverage %>% 
+  pivot_wider(names_from = 'Indicator', values_from = 'First Tooltip')
+
+uhc_coverage_clean_locations = str_replace_all(uhc_coverage_clean$Location, c(" " = "_"))
+
+uhc_coverage_clean_with_underscores = mutate(uhc_coverage_clean, 'Location' = uhc_coverage_clean_locations)
+
+reproductiveAgeWomen_Clean <- 
+  reproductiveAgeWomen %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Percent of women with family planning needs satisfied" = "First Tooltip")
+
+adolescentBirthRate_Clean <- 
+  adolescentBirthRate %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Adolescent birth rate" = "First Tooltip")
+
+HALElifeExpectancy_Clean <-
+  HALElifeExpectancy %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("HALE_Both sexes" = "Both sexes", 
+         "HALE_Male" = "Male", 
+         "HALE_Female" = "Female", 
+         "Year" = "Period")
+
+uhc_coverage_clean_with_underscores_renamed <-
+  uhc_coverage_clean_with_underscores %>%
+  rename("Year" = "Period") 
+
+medicalDoctors_clean <- 
+  medicalDoctors %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Medical_Doctors" = "First Tooltip")
+
+nursingAndMidwife_clean <- nursingAndMidwife %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Nursing_And_Midwife" = "First Tooltip")
+
+Female_HALE_regressors <- uhc_coverage_clean_with_underscores_renamed %>%
+  full_join(adolescentBirthRate_Clean, by = c("Location", "Year")) %>%
+  full_join(HALElifeExpectancy_Clean, by = c("Location", "Year")) %>%
+  full_join(medicalDoctors_clean, by = c("Location", "Year")) %>%
+  full_join(nursingAndMidwife_clean, by = c("Location", "Year")) %>%
+  drop_na() %>%
+  select(-"HALE_Both sexes", -"HALE_Male") %>%
+  rename("UHC" = "UHC index of essential service coverage")
+```
+
+# Modeling
+```{r}
+MAE.func = function(resid) {
+  return(mean(abs(resid)))
+}
+```
+```{r}
+set.seed(100)
+FHR_shuffle <- Female_HALE_regressors[sample(nrow(Female_HALE_regressors)),]
+
+indices <- sample(seq_len(nrow(FHR_shuffle)), size=round(0.8*nrow(FHR_shuffle)))
+
+train_data <- FHR_shuffle[indices,]
+test_data <- FHR_shuffle[-indices,]
+```
+```{r}
+uhc_model <- lm(HALE_Female~UHC,data=train_data)
+teen_pregnancy_model <- lm(HALE_Female~`Adolescent birth rate`, data=train_data)
+med_doc_model <- lm(HALE_Female~Medical_Doctors, data=train_data)
+midwife_model <- lm(HALE_Female~Nursing_And_Midwife, data=train_data)
+uhc_teen_pregnancy_model <- lm(HALE_Female~UHC+`Adolescent birth rate`, data=train_data)
+all_regressors_model <- lm(HALE_Female~UHC+`Adolescent birth rate`+Medical_Doctors+Nursing_And_Midwife, data=train_data)
+```
+```{r}
+print(summary(uhc_model))
+print(summary(teen_pregnancy_model))
+print(summary(med_doc_model))
+print(summary(midwife_model))
+print(summary(uhc_teen_pregnancy_model))
+print(summary(all_regressors_model))
+```
+```{r}
+test_data <- test_data %>%
+  gather_predictions(uhc_model, teen_pregnancy_model, med_doc_model, midwife_model, uhc_teen_pregnancy_model, all_regressors_model) %>%
+  gather_residuals(uhc_model, teen_pregnancy_model, med_doc_model, midwife_model, uhc_teen_pregnancy_model, all_regressors_model)
+```
+```{r}
+uhc_data <- test_data %>%
+  filter(model == "uhc_model")
+teen_pregnancy_data <- test_data %>%
+  filter(model == "teen_pregnancy_model")
+med_doc_data <- test_data %>%
+  filter(model == "med_doc_model")
+midwife_data <- test_data %>%
+  filter(model == "midwife_model")
+uhc_teen_pregnancy_data <- test_data %>%
+  filter(model == "uhc_teen_pregnancy_model")
+all_regressors_data <- test_data %>%
+  filter(model == "all_regressors_model")
+
+models <- c("uhc_model", "teen_pregnancy_model", "med_doc_model", "midwife_model", "uhc_teen_pregnancy_model", "all_regressors_model")
+MAE <- c()
+MAE[1] = MAE.func(uhc_data$resid)
+MAE[2] = MAE.func(teen_pregnancy_data$resid)
+MAE[3] = MAE.func(med_doc_data$resid)
+MAE[4] = MAE.func(midwife_data$resid)
+MAE[5] = MAE.func(uhc_teen_pregnancy_data$resid)
+MAE[6] = MAE.func(all_regressors_data$resid)
+model_MAE <- tibble(
+  model = models,
+  MAE = MAE
+)
+ggplot(model_MAE, aes(x=model, weight=MAE)) +
+  geom_bar()
+test_data %>%
+  filter(model %in% c("uhc_teen_pregnancy_model", "all_regressors_model")) %>%
+  ggplot(aes(x=resid, color = model)) +
+    geom_freqpoly(binwidth =.5)
+plot(all_regressors_model)
+```
+
+# Colinearity of Variables
+```{r}
+cor(FHR_shuffle$UHC, FHR_shuffle$`Adolescent birth rate`)
+ggplot(FHR_shuffle,aes(x=UHC, y=`Adolescent birth rate`)) + 
+  geom_point() +
+  geom_smooth(method = 'lm', se = F)
+```
+```{r}
+cor(FHR_shuffle$UHC, FHR_shuffle$Medical_Doctors)
+ggplot(FHR_shuffle,aes(x=UHC, y=Medical_Doctors)) + 
+  geom_point() +
+  geom_smooth(method = 'lm', se = F)
+```
+```{r}
+cor(FHR_shuffle$UHC, FHR_shuffle$Nursing_And_Midwife)
+ggplot(FHR_shuffle,aes(x=UHC, y=Nursing_And_Midwife)) + 
+  geom_point() +
+  geom_smooth(method = 'lm', se = F)
+```
+```{r}
+cor(FHR_shuffle$`Adolescent birth rate`, FHR_shuffle$Medical_Doctors)
+ggplot(FHR_shuffle,aes(x=`Adolescent birth rate`, y=Medical_Doctors)) + 
+  geom_point() +
+  geom_smooth(method = 'lm', se = F)
+```
+```{r}
+cor(FHR_shuffle$`Adolescent birth rate`, FHR_shuffle$Nursing_And_Midwife)
+ggplot(FHR_shuffle,aes(x=`Adolescent birth rate`, y=Nursing_And_Midwife)) + 
+  geom_point() +
+  geom_smooth(method = 'lm', se = F)
+```
+```{r}
+cor(FHR_shuffle$Nursing_And_Midwife, FHR_shuffle$Medical_Doctors)
+ggplot(FHR_shuffle,aes(x=Nursing_And_Midwife, y=Medical_Doctors)) + 
+  geom_point() +
+  geom_smooth(method = 'lm', se = F)
+```
+
+
+
+
+
+
+

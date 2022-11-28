@@ -1,0 +1,462 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(modelr)       #Helpful Functions in Modeling
+library(purrr)
+library(broom)
+
+# Import Data Below
+# read_csv()
+```
+
+```{r}
+#read CSV files
+HALElifeExpectancy = read_csv("HALElifeExpectancyAtBirth.csv")
+AlcoholSubstanceAbuse = read_csv("alcoholSubstanceAbuse.csv")
+medicalDoctors = read_csv("medicalDoctors.csv")
+uhcCoverage = read_csv("uhcCoverage.csv")
+crudeSuicideRates = read_csv("crudeSuicideRates.csv")
+roadTrafficDeaths = read_csv("roadTrafficDeaths.csv")
+reproductiveAgeWomen = read_csv("reproductiveAgeWomen.csv")
+adolescentBirthRate = read_csv("adolescentBirthRate.csv")
+eliminateViolenceAgainstWomen = read_csv("eliminateViolenceAgainstWomen.csv")
+`3070cancerChdEtc` = read_csv("30-70cancerChdEtc.csv")
+airPollutionDeathRate = read_csv("airPollutionDeathRate.csv")
+atLeastBasicSanitizationServices <- read_csv("atLeastBasicSanitizationServices.csv")
+```
+
+# Creator: Kevin Lu
+
+### Q1: What is the relationship between universal health coverage and crude suicide rates?
+
+```{r, eval = T}
+#Kevin Question 1
+
+uhcCoverage_Clean <- 
+  uhcCoverage %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "UHC index of essential service coverage" = "First Tooltip")
+
+crudeSuicideRates_Clean <- 
+  crudeSuicideRates %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("CSR_Both sexes" = "Both sexes", 
+         "CSR_Male" = "Male", 
+         "CSR_Female" = "Female", 
+         "Year" = "Period")
+
+uhc_CSR_join <- uhcCoverage_Clean %>%
+  full_join(crudeSuicideRates_Clean, by = c("Location", "Year"))
+kevq1 <- uhc_CSR_join %>%
+  drop_na()
+ggplot(kevq1, aes(x=`UHC index of essential service coverage`, y=`CSR_Both sexes`)) +
+  geom_point() +
+  geom_smooth(method= 'lm') +
+  ggtitle("UHC Index vs Crude Suicide Rates") +
+  labs(x="UHC Index of Service Coverage (SCI)", y="Crude Suicide Rates per 100,000 Population")
+```
+
+### Q2: What is the relationship between alcohol substance abuse and road traffic deaths?
+
+```{r, eval = T}
+#Kevin Question 2
+
+roadTrafficDeaths_Clean <- 
+  roadTrafficDeaths %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Estimated road traffic death rate (per 100 000 population)" = "First Tooltip")
+
+AlcoholSubstanceAbuse_Clean <- 
+  AlcoholSubstanceAbuse %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("ASA_Both sexes" = "Both sexes", 
+         "ASA_Male" = "Male", 
+         "ASA_Female" = "Female", 
+         "Year" = "Period")
+
+kevq2 <- AlcoholSubstanceAbuse_Clean %>%
+  filter(Year == 2015) %>%
+  inner_join(roadTrafficDeaths_Clean, by = c("Location"))
+  
+ggplot(kevq2, aes(x= `ASA_Both sexes`, y=`Estimated road traffic death rate (per 100 000 population)`)) +
+  geom_point() +
+  geom_smooth(method = 'lm') +
+  ggtitle("Alcohol Substance Abuse vs Road Traffic Deaths") +
+  labs(x="Total Alcohol Consumption per Capita (15+)", y="Estimated Road Traffic Death Rate per 100,000 Population")
+
+#roadTrafficDeaths only contains values for 2016 - medicalDoctors is the only dataset with 2016 in the joined dataset
+```
+
+# Interpreter: Aditi Chiney
+
+### Q1: Does increased UHC coverage predict better health outcomes for women across the following variables: (1) average reproductive age for women who have access to family planning services, (2) teenage pregnancy birth rates, and (3) healthy life expectancy at birth for women?
+
+```{r}
+#Aditi Question 1
+
+reproductiveAgeWomen_Clean <- 
+  reproductiveAgeWomen %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Percent of women with family planning needs satisfied" = "First Tooltip")
+
+adolescentBirthRate_Clean <- 
+  adolescentBirthRate %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Adolescent birth rate" = "First Tooltip")
+
+HALElifeExpectancy_Clean <-
+  HALElifeExpectancy %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("HALE_Both sexes" = "Both sexes", 
+         "HALE_Male" = "Male", 
+         "HALE_Female" = "Female", 
+         "Year" = "Period")
+
+uhc_coverage_clean_with_underscores_renamed <-
+  uhc_coverage_clean_with_underscores %>%
+  rename("Year" = "Period") 
+
+uhc_reproductiveage <- uhc_coverage_clean_with_underscores_renamed %>%
+  full_join(reproductiveAgeWomen_Clean, by = c("Location", "Year" )) %>%
+  drop_na() %>%
+  filter(Year == 2015)
+
+AC_Plot1 <- ggplot(data = uhc_reproductiveage, aes(x = `UHC index of essential service coverage`, y = `Percent of women with family planning needs satisfied`)) +
+  geom_point() +
+  geom_smooth(method= 'lm') +
+  theme(plot.margin=unit(c(3,1,3,1),"pt")) +
+  ggtitle("UHC Index vs Family Planning Needs Satisified") +
+  labs(x="UHC Index of Service Coverage (SCI)", y="% Family Planning Needs Satisfied")
+
+uhc_teenpregnancy <- uhc_coverage_clean_with_underscores_renamed %>%
+  full_join(adolescentBirthRate_Clean, by = c("Location", "Year")) %>%
+  drop_na() %>%
+  filter(Year == 2015)
+
+AC_Plot2 <- ggplot(data = uhc_teenpregnancy, aes(x = `UHC index of essential service coverage`,
+                           y = `Adolescent birth rate`)) +
+  geom_point() +
+  geom_smooth(method= 'lm') +
+  theme(plot.margin=unit(c(2,1,2,1),"pt")) +
+  ggtitle("UHC Index vs Teen birth rate") +
+  labs(x="UHC Index of Service Coverage (SCI)", y="Teen birth rate")
+
+uhc_femalelifeexpectancy <- uhc_coverage_clean_with_underscores_renamed %>%
+  full_join(HALElifeExpectancy_Clean, by = c("Location", "Year")) %>%
+  drop_na() %>%
+  select(-"HALE_Both sexes", -"HALE_Male") %>%
+  filter(Year == 2015)
+
+AC_Plot3 <- ggplot(data = uhc_femalelifeexpectancy, aes(x = `UHC index of essential service coverage`,
+                                                 y = `HALE_Female`)) +
+  geom_point() +
+  geom_smooth(method= 'lm') +
+  theme(plot.margin=unit(c(2,1,1,1),"pt")) +
+  ggtitle("UHC Index vs Female life expectancy") +
+  labs(x="UHC Index of Service Coverage (SCI)", y="Female life expectancy")
+
+gridExtra::grid.arrange(AC_Plot1, AC_Plot2, AC_Plot3)
+
+```
+### Q2: How does the probability of dying between ages 30-70 from a chronic disease (CVD, cancer, diabetes, chronic respiratory illness) vary with UHC coverage?
+
+```{r, eval = T}
+#Aditi Question 2
+
+`3070cancerChdEtc_Clean` <-
+  `3070cancerChdEtc` %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("3070_Both sexes" = "Both sexes", 
+         "3070_Male" = "Male", 
+         "3070_Female" = "Female", 
+         "Year" = "Period")
+
+uhc_cancer <- uhc_coverage_clean_with_underscores_renamed %>%
+  full_join(`3070cancerChdEtc_Clean`, by = c("Location", "Year")) %>%
+  drop_na() %>%
+  select(-"3070_Female", -"3070_Male") %>%
+  filter(Year == 2015)
+
+AC_Plot4 <- ggplot(data = uhc_cancer, aes(x = `UHC index of essential service coverage`,
+                                                 y = `3070_Both sexes`)) +
+  geom_point() +
+  geom_smooth(method= 'lm') +
+  ggtitle("UHC Index vs Risk of Mortality from Cancer, CVD, or Diabetes") +
+  labs(x="UHC Index of Service Coverage (SCI)", y="Risk of Mortality from Cancer, CVD, or Diabetes")
+
+AC_Plot4
+
+```
+# Orator: Jessica Barta
+
+### QUESTIONS 1 AND 2: WHICH COUNTRIES INCREASED THEIR OVERALL HEALTHCARE THE MOST? WHICH COUNTRIES DECREASED THEIR OVERALL HEALTHCARE THE MOST? 
+
+```{r, eval = F}
+uhc_coverage_clean <- 
+  uhcCoverage %>% 
+  pivot_wider(names_from = 'Indicator', values_from = 'First Tooltip')
+
+uhc_coverage_clean
+
+life_expectancy_at_birth_clean <-
+    HALElifeExpectancy %>% 
+  pivot_wider(names_from = 'Indicator', values_from = 'First Tooltip')
+life_expectancy_at_birth_clean
+
+cancer_clean <-
+  `3070cancerChdEtc` %>%
+  pivot_wider(names_from = 'Indicator', values_from = 'First Tooltip')
+cancer_clean_filtered = filter(cancer_clean, Dim1 == "Both sexes")
+
+sanitation_clean <-
+  atLeastBasicSanitizationServices %>%
+  pivot_wider(names_from = 'Indicator', values_from = 'First Tooltip')
+sanitation_clean
+```
+
+```{r, eval = F}
+ggplot(data = uhc_coverage_clean, aes(x = Period, y = `UHC index of essential service coverage`, group = Location)) +
+  geom_line() + facet_wrap(~Location)
+
+#there are spaces in the country names that are preventing R from reading the locations correctly. Replace all spaces with underscores.
+
+uhc_coverage_clean_locations = str_replace_all(uhc_coverage_clean$Location, c(" " = "_"))
+uhc_coverage_clean_locations
+#now try graph again 
+
+uhc_coverage_clean_with_underscores = mutate(uhc_coverage_clean, 'Location' = uhc_coverage_clean_locations)
+uhc_coverage_clean_with_underscores
+
+#the visualization is too crowded. Split up the datset to make it cleaner
+```
+```{r, eval = F}
+uhc_coverage_clean_with_underscores
+```
+
+```{r, eval = T}
+dataset1 =uhc_coverage_clean_with_underscores[1:50,]
+dataset2 = uhc_coverage_clean_with_underscores[51:100,]
+dataset3 = uhc_coverage_clean_with_underscores[101:150,]
+dataset4 = uhc_coverage_clean_with_underscores[151:200,]
+dataset5 = uhc_coverage_clean_with_underscores[201: 250,]
+dataset6 = uhc_coverage_clean_with_underscores[250: 300,]
+dataset7 = uhc_coverage_clean_with_underscores[301: 366,]
+ggplot(data = dataset2, aes(x = Period, y = `UHC index of essential service coverage`, group = Location, colour = Location)) +
+  geom_line() + ggtitle("Change in healthcare coverage/time")
+
+uhc_coverage_clean_with_underscores_2 = pivot_wider(uhc_coverage_clean_with_underscores, names_from = 'Period', values_from = 'UHC index of essential service coverage') %>%
+  mutate('difference' = `2017` - `2015`)
+
+largest_changes = filter(uhc_coverage_clean_with_underscores, Location %in% c("Ireland", "Nepal", "Croatia"))
+
+ggplot(data = largest_changes, aes(x = Period, y = `UHC index of essential service coverage`, group = Location, colour = Location)) +
+  geom_line() + ggtitle("Countries with greatest change in healthcare coverage/time")
+
+#Therefore, Croatia increased the most in terms of universal health care and Ireland and Nepal decreased the most. 
+
+#Croatia goes from a uhs index of 60 to 71 from 2015 to 2017.
+
+#use this code to show Croatia's change over time, because it is the most dramatic, compared to 49 other countries: ggplot(data = dataset1, aes(x = Period, y = `UHC index of essential service coverage`, group = Location, colour = Location)) + geom_line() 
+
+#use this code to show the changes over time of healthcare coverage for the 3 countries where it changed the most: ggplot(data = largest_changes, aes(x = Period, y = `UHC index of essential service coverage`, group = Location, colour = Location)) + geom_line() 
+```
+# Deliverer: JULIA MENGXUAN YU
+
+### Question 1: What’s the relationship between health expectancy and alcohol substance abuse in groups of males and females? Is there a significant difference between these two groups?
+```{r, eval = T}
+#Julia DATA Chunk
+HALElifeExpectancy_JY <- 
+  HALElifeExpectancy %>%
+  select(-Indicator)  %>%
+  rename("HALE"="First Tooltip", 
+         "Year" = "Period",
+         "Sex" = "Dim1") %>%
+  arrange(desc(Year))
+medicalDoctors_JY <- 
+  medicalDoctors %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Medical_Doctors" = "First Tooltip")
+AlcoholSubstanceAbuse_JY <- 
+  AlcoholSubstanceAbuse %>%
+  select(-Indicator)  %>%
+  rename("Alcohol_Substance_Abuse"="First Tooltip", 
+         "Year" = "Period",
+         "Sex" = "Dim1")
+HALE_MD_ASA <-HALElifeExpectancy_JY %>%
+  full_join(medicalDoctors_JY, by = c("Location", "Year")) %>%
+  full_join(AlcoholSubstanceAbuse_JY, by = c("Location", "Year","Sex"))
+HALE_MD_ASA
+HALE_MD_ASA_new<- na.omit(HALE_MD_ASA) %>%
+  filter(Sex=="Female")
+HALE_MD_ASA_new
+```
+```{r}
+ggplot(HALE_MD_ASA_new,aes(x=Alcohol_Substance_Abuse, y=HALE)) +
+  geom_point(alpha=0.3) +
+  geom_smooth(method="lm") +
+  ggtitle("Alcohol Substance Abuse vs Health Expectancy") +
+  labs(x="Total Alcohol Consumption per Capita (15+)", y="Health Expectancy")
+```
+
+ggplot(HALE_MD_ASA_new,aes(x=Sex, y=HALE)) +
+  geom_tile(aes(fill = Alcohol_Substance_Abuse)) +
+  labs(x="gender", y="Alcohol Substance Abuse")
+
+```{r}
+cor_data <- HALE_MD_ASA_new%>%
+  select(-c(Location,Sex)) 
+print(round(cor(cor_data),3))
+```
+
+
+```{r}
+#Innocent model
+#Even though the variables are significant, the residual plot, Q-Q plot, standarded residuals are not good. So I want to improve the model.
+mod1=lm(HALE~(Alcohol_Substance_Abuse)+(Medical_Doctors),data=HALE_MD_ASA_new)
+summary(mod1)
+plot(mod1)
+```
+
+```{r}
+#Function chunk
+train.model.func=function(data,i,j){
+  mod=lm(HALE~poly(Alcohol_Substance_Abuse,i)+poly(Medical_Doctors,j),data=HALE_MD_ASA_new)
+  return(mod)
+}
+RMSE.func=function(actual,predict){
+  mse=mean((actual-predict)^2,na.rm=T)
+  rmse=sqrt(mse)
+  return(rmse)
+}
+```
+
+```{r}
+DATA_JY=na.omit(HALE_MD_ASA_new) %>% crossv_kfold(10)
+DATA_JY
+```
+```{r}
+max_i = 5
+max_j = 5
+rmse_results = matrix(NA,max_i,max_j)
+for(i in 1:max_i){
+  for(j in 1:max_j){
+    DATA_new=DATA_JY %>%
+      mutate(tr.model=map(train, train.model.func, i=i, j=j))
+    DATA_new.PREDICT=DATA_new%>%
+      mutate(predict=map2(test, tr.model,~augment(.y,newdata=.x)))%>%
+      select(predict)%>%
+      unnest()
+rmse_results[i,j]=RMSE.func(actual=DATA_new.PREDICT$HALE, predict=DATA_new.PREDICT$.fitted)
+  }
+}
+```
+
+```{r}
+which(rmse_results==min(rmse_results), arr.ind = T)
+```
+```{r}
+mod_new=lm(HALE~poly(Alcohol_Substance_Abuse,5)+poly(Medical_Doctors,5),data=HALE_MD_ASA_new)
+summary(mod_new)
+plot(mod_new)
+```
+
+
+### Question 2:How can the variable medical doctor influence health expectancy and alcohol substance abuse? What is the result of the first question after accounting for the influence of medical doctor?
+```{r, eval = T}
+ggplot(HALE_MD_ASA_new,aes(x= Medical_Doctors, y=HE,color=Dim1.x)) +
+  geom_point(alpha=0.5)+
+  geom_smooth() +
+  ggtitle("Medical Doctors vs Health Life Expectancy") +
+  labs(x="Medical doctors (per 10,000)", y="Healthy life expectancy (HALE) at birth (years)")
+ggplot(HALE_MD_ASA_new,aes(x= Medical_Doctors, y=asa,color=Dim1.x)) +
+  geom_point(alpha=0.5)+
+  geom_smooth() +
+  ggtitle("Medical Doctors vs Alcohol Substance Abuse") +
+  labs(x="Medical doctors (per 10,000)", y="Total Alcohol Consumption per Capita (15+)")
+```
+
+# Follow-up Questions
+
+### New Questions Based Off Initial Investigation
+
+- Q1: Does the relationship between UHC and crude suicide rates change when gender is a factor?
+- Q2: What is the distribution of medical doctors look like? Is the distribution of medical doctors related to the transition in the chart"Medical Doctors vs Alcohol Substance Abuse"?
+- Q3: WHAT IS THE DISTRIBUTION OF CHANGES IN THE HEALTHCARE INDEX? HOW MUCH DOES IT TEND TO VARY?
+
+### Investigation of Follow-up Questions
+
+GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES (*Example:* Our group decided to investigate Q2 and Q4 in further detail.)
+
+The two questions that we decided to investigate further were Q1 and Q3.
+
+SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
+
+```{r}
+# Follow-Up Question (Q1)
+#Does the relationship between UHC and crude suicide rates change when gender is a factor?
+kevFollowUp <- crudeSuicideRates %>%
+  select(-Indicator) %>%
+  rename("Sex" = "Dim1", 
+         "CSR" = "First Tooltip", 
+         "Year" = "Period") %>% 
+  filter(Sex != 'Both sexes') %>%
+  full_join(uhcCoverage_Clean, by = c("Location", "Year")) %>%
+  drop_na()
+ggplot(kevFollowUp, aes(x=`UHC index of essential service coverage`, y=`CSR`, color=Sex)) +
+  geom_point() +
+  geom_smooth(method= 'lm') +
+  ggtitle("UHC Index vs Crude Suicide Rates Between Males and Females") +
+  labs(x="UHC Index of Service Coverage (SCI)", y="Crude Suicide Rates per 100,000 Population")
+```
+
+```{r}
+# Follow question (Q3)
+#WHAT IS THE DISTRIBUTION OF CHANGES IN THE HEALTHCARE INDEX? HOW MUCH DOES IT TEND TO VARY?
+
+ggplot(data = uhc_coverage_clean_with_underscores_2, mapping = aes(x = difference)) + 
+  geom_boxplot()+ coord_flip() + ggtitle("Distribution of Changes in Healthcare Coverage")
+```
+
+# Summary
+
+GIVE A 2 PARAGRAPH SUMMARY. 
+
+PARAGRAPH 1 SHOULD DESCRIBE WHAT YOU LEARNED ABOUT YOUR DATA FROM INVESTIGATING THE INITIAL QUESTIONS. DID YOU FIND ANYTHING UNUSUAL IN YOUR DATA? DID ANYTHING SURPRISE YOU? WHICH OF THE INITIAL QUESTIONS WERE HELPFUL IN LEADING YOU TO MORE QUESTIONS?
+
+The data showed surprising results for the initial questions relating UHC coverage and suicide rates. Kevin observed a positive correlation between universal health coverage and crude suicide rates, which we had expected to be a negative correlation. We also observed a negative correlation between alcohol consumption and road traffic deaths, which we had expected to be a positive correlation. Similarly, Julia's data and plots showed me surprising results for her initial questions. We had assumed that the increase of alchohol abuse would lead to a negative influence on life expectancy. The female group showed a stronger positive relationships. However, the first plot showed a positive relationship. So we questioned if the increasing of medical doctors would affect these two variables. As medical doctors increases life expectancy tend to be stable, while for alcohol abuse, the pattern is quite ambiguous. Jessica found that Croatia increased healthcare coverage the most (+11) while Ireland and Nepal decreased their coverage the most (-3). Most countries didn't see much change in their coverage between 2015 and 2017, because the standard deviation was low, about 1.7. Aditi's investigation was not as surprising, but rather confirmed some standard patterns that we expected to observe. For example, as UHC coverage increased, we saw that indicators of women's health improved (more access to family planning services, lower teen birth rates, and greater life expectancy for women). We also saw that as UHC coverage increases, the risk of mortality also decreases. This has key implications for governments looking to improve their nation's health by expanding access to UHC. 
+
+PARAGRAPH 2 SHOULD SUMMARIZE WHAT YOU LEARNED FROM INVESTIGATING THE FOLLOW-UP QUESTIONS. WHY ARE THESE FOLLOW-UP QUESTIONS INTERESTING FOR INVESTIGATION? DESCRIBE THE TABLES/FIGURES YOU USED TO EXPLORE ANSWERS TO THESE FOLLOW-UP QUESTIONS? WHAT DID YOU LEARN FROM THE TABLES/FIGURES REGARDING THE FOLLOW-UP QUESTIONS YOU PROPOSED?
+
+The first follow up question explored the relationship between universal health coverage and crude suicide rates while considering gender as a factor. The new figure showed that the positive correlation observed in the initial question is almost entirely due to a strong positive correlation for males, while there was little to no change for females based on universal health coverage. The figure also provides insight that female suicide rates are much lower than male suicide rates overall. The second follow up question explored the distribution of changes in the healthcare index. Most countries didn't see much change in their coverage between 2015 and 2017, based on the low standard deviation, about 1.7, and boxplot showing little variation. There were only a couple outliers noted above. The lack of variation brings up questions about how healthcare coverage was measured. Should the WHO have used a more sensitive measurement that would pick up more variation? It seems unlikely that nearly all the countries surveyed changed very little, or the same amount, over time.
+
+
+
+
+
+
+
+
+
+
+
+
+
+

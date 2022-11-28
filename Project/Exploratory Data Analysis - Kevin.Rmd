@@ -1,0 +1,113 @@
+---
+title: "Exploratory Data Analysis"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+rm(list = ls())
+```
+
+```{r}
+#read CSV files
+
+HALElifeExpectancy = read_csv("HALElifeExpectancyAtBirth.csv")
+AlcoholSubstanceAbuse = read_csv("alcoholSubstanceAbuse.csv")
+medicalDoctors = read_csv("medicalDoctors.csv")
+uhcCoverage = read_csv("uhcCoverage.csv")
+crudeSuicideRates = read_csv("crudeSuicideRates.csv")
+roadTrafficDeaths = read_csv("roadTrafficDeaths.csv")
+reproductiveAgeWomen = read_csv("reproductiveAgeWomen.csv")
+adolescentBirthRate = read_csv("adolescentBirthRate.csv")
+eliminateViolenceAgainstWomen = read_csv("eliminateViolenceAgainstWomen.csv")
+`3070cancerChdEtc` = read_csv("30-70cancerChdEtc.csv")
+airPollutionDeathRate = read_csv("airPollutionDeathRate.csv")
+```
+
+```{r}
+#Kevin Question 1
+
+uhcCoverage_Clean <- 
+  uhcCoverage %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "UHC index of essential service coverage" = "First Tooltip")
+
+crudeSuicideRates_Clean <- 
+  crudeSuicideRates %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("CSR_Both sexes" = "Both sexes", 
+         "CSR_Male" = "Male", 
+         "CSR_Female" = "Female", 
+         "Year" = "Period")
+
+uhc_CSR_join <- uhcCoverage_Clean %>%
+  full_join(crudeSuicideRates_Clean, by = c("Location", "Year"))
+kevq1 <- uhc_CSR_join %>%
+  drop_na()
+ggplot(kevq1, aes(x=`UHC index of essential service coverage`, y=`CSR_Both sexes`)) +
+  geom_point() +
+  geom_smooth(method= 'lm') +
+  ggtitle("UHC Index vs Crude Suicide Rates") +
+  labs(x="UHC Index of Service Coverage (SCI)", y="Crude Suicide Rates per 100,000 Population")
+```
+
+```{r}
+#Kevin Question 2
+
+roadTrafficDeaths_Clean <- 
+  roadTrafficDeaths %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Estimated road traffic death rate (per 100 000 population)" = "First Tooltip")
+
+AlcoholSubstanceAbuse_Clean <- 
+  AlcoholSubstanceAbuse %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("ASA_Both sexes" = "Both sexes", 
+         "ASA_Male" = "Male", 
+         "ASA_Female" = "Female", 
+         "Year" = "Period")
+
+kevq2 <- AlcoholSubstanceAbuse_Clean %>%
+  filter(Year == 2015) %>%
+  inner_join(roadTrafficDeaths_Clean, by = c("Location"))
+  
+ggplot(kevq2, aes(x= `ASA_Both sexes`, y=`Estimated road traffic death rate (per 100 000 population)`)) +
+  geom_point() +
+  geom_smooth(method = 'lm') +
+  ggtitle("Alcohol Substance Abuse vs Road Traffic Deaths") +
+  labs(x="Total Alcohol Consumption per Capita (15+)", y="Estimated Road Traffic Death Rate per 100,000 Population")
+
+#roadTrafficDeaths only contains values for 2016 - medicalDoctors is the only dataset with 2016 in the joined dataset
+```
+```{r}
+#Kevin Follow-Up Question
+#Does the relationship between UHC and crude suicide rates change when gender is a factor?
+kevFollowUp <- crudeSuicideRates %>%
+  select(-Indicator) %>%
+  rename("Sex" = "Dim1", 
+         "CSR" = "First Tooltip", 
+         "Year" = "Period") %>% 
+  filter(Sex != 'Both sexes') %>%
+  full_join(uhcCoverage_Clean, by = c("Location", "Year")) %>%
+  drop_na()
+ggplot(kevFollowUp, aes(x=`UHC index of essential service coverage`, y=`CSR`, color=Sex)) +
+  geom_point() +
+  geom_smooth(method= 'lm') +
+  ggtitle("UHC Index vs Crude Suicide Rates Between Males and Females") +
+  labs(x="UHC Index of Service Coverage (SCI)", y="Crude Suicide Rates per 100,000 Population")
+```
+Kevin Summary: 
+The data showed surprising results for the initial questions. I observed a positive correlation between universal health coverage and crude suicide rates, which I had expected to be a negative correlation. I also observed a negative correlation between alcohol consumption and road traffic deaths, which I had expected to be a positive correlation. 
+
+The follow up question explored the relationship between universal health coverage and crude suicide rates while considering gender as a factor. The new figure showed that the positive correlation observed in the initial question is almost entirely due to a strong positive correlation for males, while there was little to no change for females based on universal health coverage. The figure also provides insight that female suicide rates are much lower than male suicide rates overall.

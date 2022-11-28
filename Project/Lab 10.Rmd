@@ -1,0 +1,152 @@
+---
+title: "Lab 10: Modeling Basics I"
+author: "JULIA MENGXUAN YU"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE,warning=F)
+library(tidyverse)
+library(broom)
+library(ISLR) #Contains dataset Carseats
+```
+
+# Introduction
+
+This lab is about multiple regression and model interpretation. 
+Part 1 is about multiple regression and collinearity. Collinearity refers to the situation in which two or more predictor variables are closely related to one another. Collinearity reduces the accuracy of the estimates of the regression coefficients, causing the standard error for coefficients to grow. Consequently, collinearity resutls in a decline in the t-statistics.
+
+Part 2 is about modeling with categorical variable. The interpretation of models contain categorical variables is different from models do not contain categorical variables.
+
+You will need to modify the code chunks so that the code works within each of chunk (usually this means modifying anything in ALL CAPS). You will also need to modify the code outside the code chunk. When you get the desired result for each step, change `Eval=F` to `Eval=T` and knit the document to HTML to make sure it works. After you complete the lab, you should submit your HTML file of what you have completed to Sakai before the deadline.
+
+# Part 1: Multiple linear regression
+
+### Q1. Run the following code to create the vectors `x1`, `x2`, and `y`.
+```{r}
+set.seed(1)
+n <- 100
+x1 <- runif(n)
+x2 <- runif(n,10,20)
+y <- 2+2*x1+0.3*x2+rnorm(n)
+```
+
+a. (2 points) What is the correlation coefficient between `x1` and `x2`? 
+
+- Calculate the correlation between `x1` and `x2` with function `cor`.
+
+- Create a scatter plot using `ggplot2` displaying the relationship between the variables `x1` and `x2` with scatter plot and smooth line.
+
+```{r, eval=T}
+cor(x1,x2)
+data = data.frame(x1=x1,x2=x2,y=y)
+ggplot(data,aes(x1,x2)) + 
+ geom_point()+geom_smooth()
+```
+
+b. (2 points) Fit a least squares regression to predict `y` using `x1` and `x2`. 
+```{r,eval=T}
+tidy(lm(y~x1+x2))
+summary(lm(y~x1+x2))
+```
+
+Can you reject the null hypothesis $H_0:\beta_1=0$? How about the null hypothesis $H_0:\beta_2=0$? (alpha=0.05)
+
+ANSWER_HERE:The p-value for beta 1 and beta 2 are 6.890047e-07 and 3.327975e-13 respectively, which are smaller than 0.05. Therefore, I reject the H_0 for both beta 1 and beta 2.
+
+c. (2 points) Now fit a least squares regression to predict `y` using only `x1`. 
+```{r, eval=T}
+tidy(lm(y~x1))
+summary(lm(y~x1))
+```
+
+Can you reject the null hypothesis $H_0:\beta_1=0$? (alpha=0.05)
+
+ANSWER_HERE:Yes, The p-value for beta 1 is 6.637947e-05, which is smaller than 0.05. Therefore, I reject the H_0 for beta 1.
+
+d. (2 points) Now fit a least squares regression to predict `y` using only `x2`. 
+```{r, eval=T}
+tidy(lm(y~x2))
+summary(lm(y~x2))
+```
+
+Can you reject the null hypothesis $H_0:\beta_2=0$? (alpha=0.05)
+
+ANSWER_HERE:Yes, The p-value for beta 2 is 2.464712e-11, which is smaller than 0.05. Therefore, I reject the H_0 for beta 2.
+
+
+2. Run the following code to create the vectors `x1`, `x2`, and `y`.
+```{r}
+set.seed(1)
+n <- 100
+a <- runif(n)
+b <- 0.5*x1+rnorm(n,0,.01)
+c <- 2+2*x1+0.3*x2+rnorm(n)
+```
+
+a) (4 points) Repeat parts a, b, c, and d of Exercise 1 using the new vectors `x1`, `x2` and `y`. 
+
+correlation and plot:
+```{r}
+cor(a,b)
+data = data.frame(x1=a,x2=b,y=c)
+ggplot(data,aes(x1,x2)) + 
+ geom_point()+geom_smooth()
+```
+
+three models:
+```{r}
+tidy((lm(c~a+b)))
+tidy(lm(c~a))
+tidy(lm(c~b))
+summary(lm(c~a+b))
+summary(lm(c~a))
+summary(lm(c~b))
+```
+
+What differences do you see between Exercise 1 and Exercise 2? Explain why these differences occur.
+
+ANSWER_HERE:In exercise 1, when predicting y using x1 and x2, x1 and  x2 are all significant. While, in the second exercise, variable b is related to variable a, so when including both of them in the model, the variables are insignificant. 
+
+
+# Part 2: Model with Categorical Variable
+
+3. This part should be answered using the `Carseats` data set.
+
+```{r}
+head(Carseats)
+```
+
+a. (1 point) Fit a multiple regression model to predict `Sales` using `Price`,`Urban`, `US` and get summary of the model.
+```{r,eval=T}
+mod<-lm(Carseats$Sales~Carseats$Price+Carseats$Urban+Carseats$US)
+summary(mod)
+```
+
+
+b. (3 points) Provide an interpretation of each coefficient in the model. Be
+careful, some of the variables in the model are categorical variables.
+(Note that `Sales` variable represents unit sales **in thousands** at each location.)
+
+ANSWER_HERE:
+
+- `Price`: The estimate for Price is -0.05, which means increase one unit of price and other predictors are held constant, it could decrease about 54 sales. The p-value is <2e-16, which is less than 0.05, and small enough, so I reject the H_0 for Price. Therefore, the coefficient is not 0.
+
+- `Urban`: The p-value for Urbanyes is 0.936, which is larger than 0.05. I cannot reject the H_0 for Urbanyes. Therefore, the coefficient is 0, which means the Sales is not affected by Urban.
+
+- `US`: The p-value is smaller than 0.05, the estimate is significant. It means the stores at US sell 1200 more than those abroad.
+
+
+c. (1 point) For which of the predictors can you reject the null hypothesis $H_0: \beta_j=0$?
+
+ANSWER_HERE:H_1(Price): beta_Price=0, H_3: beta_USyes=0
+
+d. (1 point) On the basis of your response to the previous question, fit a smaller model that only uses the predictors for which there is evidence of association with the outcome, and get summary of the model.
+```{r,eval=T}
+summary(lm(Sales~Price+US, data=Carseats))
+```
+
+e. (2 points) How well do the models in (a) and (d) fit the data?
+
+ANSWER_HERE: The R-Square for both of them are 0.2393, there are both 23.93% of data are explianed by these two model.

@@ -1,0 +1,103 @@
+---
+title: "Exploratory Data Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+rm(list = ls())
+```
+
+```{r}
+#CSV files were read in using file -> import dataset
+```
+```{r}
+uhc_coverage_clean <- 
+  uhcCoverage %>% 
+  pivot_wider(names_from = 'Indicator', values_from = 'First.Tooltip')
+
+uhc_coverage_clean
+
+life_expectancy_at_birth_clean <-
+    HALElifeExpectancyAtBirth %>% 
+  pivot_wider(names_from = 'Indicator', values_from = 'First Tooltip')
+life_expectancy_at_birth_clean
+
+cancer_clean <-
+  cancerChdEtc30_70 %>%
+  pivot_wider(names_from = 'Indicator', values_from = 'First Tooltip')
+cancer_clean_filtered = filter(cancer_clean, Dim1 == "Both sexes")
+
+sanitation_clean <-
+  atLeastBasicSanitizationServices %>%
+  pivot_wider(names_from = 'Indicator', values_from = 'First Tooltip')
+sanitation_clean
+
+#It is very difficult to look at how countries are improving over time because each dataset takes measurements over different years. Therefore, I will use uhc coverage (healthcare coverage) as a proxy for healthcare services overall, and look at how that has changed over time. 
+
+
+# ggplot(data = uhc_coverage_clean, aes(x = Period, y = `UHC index of essential service coverage`, group = Location)) +
+  #geom_line()
+
+#that code produces a visualization that is too crowded. Try making a faceted line plot.
+
+ggplot(data = uhc_coverage_clean, aes(x = Period, y = `UHC index of essential service coverage`, group = Location)) +
+  geom_line() + facet_wrap(~Location)
+
+#there are spaces in the country names that are preventing R from reading the locations correctly. Replace all spaces with underscores.
+
+uhc_coverage_clean_locations = str_replace_all(uhc_coverage_clean$Location, c(" " = "_"))
+uhc_coverage_clean_locations
+#now try graph again 
+
+uhc_coverage_clean_with_underscores = mutate(uhc_coverage_clean, 'Location' = uhc_coverage_clean_locations)
+uhc_coverage_clean_with_underscores
+
+#the visualization is too crowded. Split up the datset to make it cleaner. 
+
+dataset1 =uhc_coverage_clean_with_underscores[1:50,]
+dataset2 = uhc_coverage_clean_with_underscores[51:100,]
+dataset3 = uhc_coverage_clean_with_underscores[101:150,]
+dataset4 = uhc_coverage_clean_with_underscores[151:200,]
+dataset5 = uhc_coverage_clean_with_underscores[201: 250,]
+dataset6 = uhc_coverage_clean_with_underscores[250: 300,]
+dataset7 = uhc_coverage_clean_with_underscores[301: 366,]
+
+#now replace each dataset with the next to narrow down the countries that experienced significant increases and decreases 
+
+ggplot(data = dataset2, aes(x = Period, y = `UHC index of essential service coverage`, group = Location, colour = Location)) +
+  geom_line() + ggtitle("Change in healthcare coverage/time")
+
+uhc_coverage_clean_with_underscores_2 = pivot_wider(uhc_coverage_clean_with_underscores, names_from = 'Period', values_from = 'UHC index of essential service coverage') %>%
+  mutate('difference' = uhc_coverage_clean_with_underscores_2$`2017` - uhc_coverage_clean_with_underscores_2$`2015`)
+
+largest_changes = filter(uhc_coverage_clean_with_underscores, Location %in% c("Ireland", "Nepal", "Croatia"))
+
+ggplot(data = largest_changes, aes(x = Period, y = `UHC index of essential service coverage`, group = Location, colour = Location)) +
+  geom_line() + ggtitle("Countries with greatest change in healthcare coverage/time")
+
+#Therefore, Croatia increased the most in terms of universal health care and Ireland and Nepal decreased the most. 
+
+#Croatia goes from a uhs index of 60 to 71 from 2015 to 2017. 
+
+#QUESTIONS 1 AND 2: WHICH COUNTRIES INCREASED THEIR OVERALL HEALTHCARE THE MOST? WHICH COUNTRIES DECREASED THEIR OVERALL HEALTHCARE THE MOST? 
+
+#use this code to show Croatia's change over time, because it is the most dramatic, compared to 49 other countries: ggplot(data = dataset1, aes(x = Period, y = `UHC index of essential service coverage`, group = Location, colour = Location)) + geom_line() 
+
+#use this code to show the changes over time of healthcare coverage for the 3 countries where it changed the most: ggplot(data = largest_changes, aes(x = Period, y = `UHC index of essential service coverage`, group = Location, colour = Location)) + geom_line() 
+
+#FOLLOWUP QUESTION: WHAT IS THE DISTRIBUTION OF CHANGES IN THE HEALTHCARE INDEX? HOW MUCH DOES IT TEND TO VARY? 
+
+ggplot(data = uhc_coverage_clean_with_underscores_2, mapping = aes(x = difference)) + 
+  geom_boxplot()+ coord_flip() + ggtitle("Distribution of Changes in Healthcare Coverage")
+```
+
+
+```{r}
+#now examine variability. Use standard deviation as measure of variability for all countries in 2015. (All datasets have this year.) First filter data to just include 2015.
+
+
+```

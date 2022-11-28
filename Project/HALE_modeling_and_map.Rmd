@@ -1,0 +1,137 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(modelr)
+library(broom)
+library(ggmap)
+
+# Import Data Below
+# read_csv()
+```
+
+```{r}
+#read CSV files
+HALElifeExpectancy = read_csv("HALElifeExpectancyAtBirth.csv")
+medicalDoctors = read_csv("medicalDoctors.csv")
+uhcCoverage = read_csv("uhcCoverage.csv")
+crudeSuicideRates = read_csv("crudeSuicideRates.csv")
+roadTrafficDeaths = read_csv("roadTrafficDeaths.csv")
+reproductiveAgeWomen = read_csv("reproductiveAgeWomen.csv")
+adolescentBirthRate = read_csv("adolescentBirthRate.csv")
+eliminateViolenceAgainstWomen = read_csv("eliminateViolenceAgainstWomen.csv")
+airPollutionDeathRate = read_csv("airPollutionDeathRate.csv")
+atLeastBasicSanitizationServices <- read_csv("atLeastBasicSanitizationServices.csv")
+nursingAndMidwife <- read_csv("nursingAndMidwife.csv")
+```
+# Data
+```{r}
+uhc_coverage_clean <- 
+  uhcCoverage %>% 
+  pivot_wider(names_from = 'Indicator', values_from = 'First Tooltip')
+head(uhc_coverage_clean)
+```
+
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(magrittr)
+library(ggmap)
+library(stringr)
+
+
+world_map_table <-map_data("world")
+
+
+#uhc_coverage_clean %>% 
+  #rename(
+    #`UHC index of essential service coverage` = Healthcare_Coverage)
+
+view(uhc_coverage_clean)
+view(unique(world_map_table$region))
+
+# RECODE NAMES
+uhc_coverage_clean$Location <- recode(uhc_coverage_clean$Location,
+                                  'United States of America' = 'USA',
+                                   'Russian Federation' = 'Russia',
+                                  'Bolivia (Plurinational State of)' = "Bolivia",
+                                  'Venezuela (Bolivarian Republic of)' = 'Venezuela',
+                                  'Côte d’Ivoire' = "Ivory Coast",
+                                  "United Republic of Tanzania" = "Tanzania",
+                                  "Congo" = "Republic of Congo",
+                                  "United Kingdom of Great Britain and Northern Ireland" = "UK",
+                                  "Czechia"= "Czech Republic",
+                                  "Republic of Moldova" = "Moldova",
+                                  "The former Yugoslav Republic of Macedonia" = "Macedonia",
+                                  "Iran (Islamic Republic of)" = "Iran",
+                                  "Syrian Arab Republic" = "Syria", 
+                                  "Republic of Korea" = "South Korea",
+                                  "Democratic People's Republic of Korea" = "North Korea",
+                                  "Viet Nam" = "Vietnam",
+                                  "Lao People's Democratic Republic" = "Laos"
+                                  )
+#join tables
+both_tables = full_join(uhc_coverage_clean, world_map_table, by = c("Location" = "region"))
+head(both_tables)
+
+both_tables <- both_tables %>% 
+  rename(
+    Latitude = lat,
+    Longitude = long)
+
+#plot map data
+ggplot() +
+  geom_polygon(data = both_tables, aes(x = Longitude, y = Latitude, group = group, fill = `Healthcare Coverage`)) +
+  labs(title = 'Essential Healthcare Coverage by Country') 
+
+
+#now try it with both 2015 and 2017! 
+
+data_from_2017 = filter(uhc_coverage_clean, Period == 2017)
+data_from_2015 = filter(uhc_coverage_clean, Period == 2015)
+
+both_tables_2017 = full_join(data_from_2017, world_map_table, by = c("Location" = "region"))
+both_tables_2015 = full_join(data_from_2015, world_map_table, by = c("Location" = "region"))
+
+both_tables_2017 <- both_tables_2017 %>% 
+  rename(
+    Latitude = lat,
+    Longitude = long)
+
+both_tables_2015 <- both_tables_2015 %>% 
+  rename(
+    Latitude = lat,
+    Longitude = long)
+both_tables_2015
+
+map_2017 <- ggplot() +
+  geom_polygon(data = both_tables_2017, aes(x = Longitude, y = Latitude, group = group, fill = `Healthcare Coverage`)) +
+  labs(title = 'Essential Healthcare Coverage by Country in 2017') 
+map_2017 +
+scale_color_continuous(breaks = c(0, 100))
+
+map_2015 <-ggplot() +
+  geom_polygon(data = both_tables_2015, aes(x = Longitude, y = Latitude, group = group, fill = `Healthcare Coverage`)) +
+  labs(title = 'Essential Healthcare Coverage by Country in 2015') 
+
+
+```
+
+
+```{r}
+both_tables
+```
+
+
+
+
+
+
+
+
+

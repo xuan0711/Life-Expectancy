@@ -1,0 +1,154 @@
+---
+title: "Exploratory Data Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+rm(list = ls())
+```
+
+```{r}
+#read CSV files
+
+HALElifeExpectancy = read_csv("HALElifeExpectancyAtBirth.csv")
+AlcoholSubstanceAbuse = read_csv("alcoholSubstanceAbuse.csv")
+medicalDoctors = read_csv("medicalDoctors.csv")
+uhcCoverage = read_csv("uhcCoverage.csv")
+crudeSuicideRates = read_csv("crudeSuicideRates.csv")
+roadTrafficDeaths = read_csv("roadTrafficDeaths.csv")
+reproductiveAgeWomen = read_csv("reproductiveAgeWomen.csv")
+adolescentBirthRate = read_csv("adolescentBirthRate.csv")
+eliminateViolenceAgainstWomen = read_csv("eliminateViolenceAgainstWomen.csv")
+`3070cancerChdEtc` = read_csv("30-70cancerChdEtc.csv")
+airPollutionDeathRate = read_csv("airPollutionDeathRate.csv")
+```
+
+```{r}
+#Julia Question 1
+AlcoholSubstanceAbuse_Clean <- 
+  AlcoholSubstanceAbuse %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("ASA_Both sexes" = "Both sexes", 
+         "ASA_Male" = "Male", 
+         "ASA_Female" = "Female", 
+         "Year" = "Period")
+
+HALElifeExpectancy_Clean <- 
+  HALElifeExpectancy %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("HALE_Both sexes" = "Both sexes", 
+         "HALE_Male" = "Male", 
+         "HALE_Female" = "Female", 
+         "Year" = "Period")
+```
+
+```{r}
+#Julia Question 2
+
+medicalDoctors_Clean <- 
+  medicalDoctors %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Medical Doctors (per 10,000)" = "First Tooltip")
+
+HALE_ASA_join <- HALElifeExpectancy_Clean %>%
+  full_join(AlcoholSubstanceAbuse_Clean, by = c("Location", "Year")) %>%
+  full_join(medicalDoctors_Clean, by = c("Location", "Year"))
+```
+
+```{r}
+#Kevin Question 1
+
+uhcCoverage_Clean <- 
+  uhcCoverage %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "UHC index of essential service coverage" = "First Tooltip")
+
+crudeSuicideRates_Clean <- 
+  crudeSuicideRates %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("CSR_Both sexes" = "Both sexes", 
+         "CSR_Male" = "Male", 
+         "CSR_Female" = "Female", 
+         "Year" = "Period")
+
+uhc_CSR_join <- uhcCoverage_Clean %>%
+  full_join(crudeSuicideRates_Clean, by = c("Location", "Year"))
+```
+
+```{r}
+#Kevin Question 2
+
+roadTrafficDeaths_Clean <- 
+  roadTrafficDeaths %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Estimated road traffic death rate (per 100 000 population)" = "First Tooltip")
+
+HALE_ASA_join <- HALE_ASA_join %>%
+  full_join(roadTrafficDeaths_Clean, by = c("Location", "Year"))
+
+#roadTrafficDeaths only contains values for 2016 - medicalDoctors is the only dataset with 2016 in the joined dataset
+```
+
+```{r}
+#Aditi Question 1
+
+reproductiveAgeWomen_Clean <- 
+  reproductiveAgeWomen %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Married or in-union women of reproductive age who 
+         have their need for family planning satisfied with modern methods (%)" = "First Tooltip")
+
+adolescentBirthRate_Clean <- 
+  adolescentBirthRate %>%
+  select(-Indicator) %>%
+  rename("Year" = "Period",
+         "Adolescent birth rate (per 1000 women aged 15-19 years)" = "First Tooltip")
+
+eliminateViolenceAgainstWomen_Clean <- 
+  eliminateViolenceAgainstWomen %>%
+  select(-Indicator, -Dim1) %>%
+  pivot_wider(names_from = "Dim2" , 
+              values_from = "First Tooltip") %>%
+  rename("Year" = "Period") %>%
+  mutate(Year = stringr::str_sub(Year, 1, 4))
+
+```
+
+```{r}
+#Aditi Question 2
+
+`3070cancerChdEtc_Clean` <-
+  `3070cancerChdEtc` %>%
+  select(-Indicator) %>%
+  pivot_wider(names_from = "Dim1" , 
+              values_from = "First Tooltip") %>%
+  rename("3070_Both sexes" = "Both sexes", 
+         "3070_Male" = "Male", 
+         "3070_Female" = "Female", 
+         "Year" = "Period")
+
+airPollutionDeathRate_Clean_Cat <-
+  airPollutionDeathRate %>%
+  # select(-Indicator) %>%
+  # pivot_wider(names_from = "Dim1" , 
+  #             values_from = "First Tooltip") %>%
+  # rename("3070_Both sexes" = "Both sexes", 
+  #        "3070_Male" = "Male", 
+  #        "3070_Female" = "Female", 
+  #        "Year" = "Period")
+```
+
